@@ -36,13 +36,10 @@
                 android:layout_height="?attr/actionBarSize"
                 app:layout_collapseMode="pin">
 
-                <com.google.android.material.tabs.TabLayout
-                    android:id="@+id/tablayout"
+                <net.lucode.hackware.magicindicator.MagicIndicator
+                    android:id="@+id/magicIndicator"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    app:tabMode="scrollable"
-                    app:tabGravity="fill"
-                    />
+                    android:layout_height="45dp" />
             </androidx.appcompat.widget.Toolbar>
         </com.google.android.material.appbar.CollapsingToolbarLayout>
     </com.google.android.material.appbar.AppBarLayout>
