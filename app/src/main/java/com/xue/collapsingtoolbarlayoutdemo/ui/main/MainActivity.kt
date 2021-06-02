@@ -1,27 +1,28 @@
 package com.xue.collapsingtoolbarlayoutdemo.ui.main
 
-import android.content.Context
 import android.os.Build
+import android.util.TypedValue
+import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.blankj.utilcode.util.*
+import com.blankj.utilcode.util.BarUtils
+import com.blankj.utilcode.util.ColorUtils
+import com.blankj.utilcode.util.LogUtils
+import com.blankj.utilcode.util.ResourceUtils
 import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.tabs.TabLayout
 import com.xue.collapsingtoolbarlayoutdemo.R
 import com.xue.collapsingtoolbarlayoutdemo.databinding.ActivityMainBinding
 import com.xue.collapsingtoolbarlayoutdemo.utils.LinearGradientUtils
 import com.zjx.app_common_library.base.viewbinding.BaseVbVmActivity
 import com.zjx.app_common_library.utils.BigDecimalUtils
-import net.lucode.hackware.magicindicator.buildins.commonnavigator.CommonNavigator
-import net.lucode.hackware.magicindicator.buildins.commonnavigator.abs.CommonNavigatorAdapter
-import net.lucode.hackware.magicindicator.buildins.commonnavigator.abs.IPagerIndicator
-import net.lucode.hackware.magicindicator.buildins.commonnavigator.abs.IPagerTitleView
-import net.lucode.hackware.magicindicator.buildins.commonnavigator.indicators.LinePagerIndicator
-import net.lucode.hackware.magicindicator.buildins.commonnavigator.titles.SimplePagerTitleView
+import com.zjx.app_common_library.utils.ext.addOnTabSelectedListener
 import java.math.BigDecimal
+
 
 class MainActivity : BaseVbVmActivity<MainViewModel, ActivityMainBinding>() {
     private val mCollapsingToolbarLayout by lazy { mViewBinding.collapsingToolbarLayout }
     private val mAppBarLayout by lazy { mViewBinding.appBarLayout }
-    private val mMagicIndicator by lazy { mViewBinding.magicIndicator }
+    private val mTabLayout by lazy { mViewBinding.tabLayout }
     private val mToolbar by lazy { mViewBinding.toolbar }
     private val mRecyclerView by lazy { mViewBinding.recyclerView }
     private val mAdapter by lazy { MainListAdapter() }
@@ -32,6 +33,9 @@ class MainActivity : BaseVbVmActivity<MainViewModel, ActivityMainBinding>() {
         )
     }
     private var mTabSelectedPosition = 0
+
+    //当前滑动位置
+    private var mCurVerticalOffset: Int? = null
 
     //滑动进度
     private var progress: Float = 0f
@@ -51,14 +55,7 @@ class MainActivity : BaseVbVmActivity<MainViewModel, ActivityMainBinding>() {
         mRecyclerView.adapter = mAdapter
         mToolbar.setNavigationIcon(R.drawable.ic_baseline_arrow_whilte_ios_24)
         mAppBarLayout.addOnOffsetChangedListener(mOffsetChangedListener)
-        initMagicIndicator()
-    }
-
-    private fun initMagicIndicator() {
-        mMagicIndicator.setBackgroundResource(ColorUtils.getColor(android.R.color.transparent))
-        val commonNavigator = CommonNavigator(this)
-        commonNavigator.adapter = mCommonNavigatorAdapter
-        mMagicIndicator.navigator = commonNavigator
+        initTabLayout()
     }
 
     override fun initData() {
@@ -70,8 +67,33 @@ class MainActivity : BaseVbVmActivity<MainViewModel, ActivityMainBinding>() {
         })
     }
 
+    private fun initTabLayout() {
+        mTabLayout.setSelectedTabIndicator(R.drawable.tab_indicator)
+        mTabLayout.addOnTabSelectedListener(null, { tab ->
+            if (tab != null) {
+                onModifyTabTextSize(tab, getTextOrIconColor(), false)
+            }
+        }, { tab ->
+            if (tab != null) {
+                onModifyTabTextSize(tab, getTextOrIconColor(), true)
+            }
+        })
+        for (index in 0 until mDataList.size) {
+            if (mTabLayout.getTabAt(index) == null) {
+                mTabLayout.addTab(mTabLayout.newTab().setText(mDataList[index]))
+            } else {
+                mTabLayout.getTabAt(index)?.setText(mDataList[index])
+            }
+        }
+    }
+
     private val mOffsetChangedListener = object : AppBarLayout.OnOffsetChangedListener {
         override fun onOffsetChanged(appBarLayout: AppBarLayout?, verticalOffset: Int) {
+            // 修改状态栏会触发 AppBarLayout重绘 onOffsetChanged() 方法，这里加个去重
+            if (mCurVerticalOffset != null && mCurVerticalOffset == verticalOffset) {
+                return
+            }
+            mCurVerticalOffset = verticalOffset
             //滑动进度
             progress = BigDecimalUtils.div(
                 BigDecimal(Math.abs(verticalOffset)),
@@ -84,57 +106,52 @@ class MainActivity : BaseVbVmActivity<MainViewModel, ActivityMainBinding>() {
             onUpdateTabTextColor(mProgressColor)
         }
     }
-    private val mCommonNavigatorAdapter = object : CommonNavigatorAdapter() {
 
-        override fun getCount(): Int = mDataList.size
-        override fun getTitleView(context: Context?, index: Int): IPagerTitleView {
-            val simplePagerTitleView = SimplePagerTitleView(context)
-            simplePagerTitleView.setText(mDataList[index])
-            simplePagerTitleView.normalColor = getTextOrIconColor()
-            simplePagerTitleView.selectedColor = simplePagerTitleView.normalColor
-            simplePagerTitleView.setTextSize(
-                if (mTabSelectedPosition == index) {
-                    20f
-                } else {
-                    14f
-                }
-            )
-            simplePagerTitleView.setOnClickListener {
-                mTabSelectedPosition = index
-                mMagicIndicator.onPageSelected(index)
-                notifyDataSetChanged()
-            }
-            return simplePagerTitleView
-        }
-
-        override fun getIndicator(context: Context?): IPagerIndicator {
-            val indicator = LinePagerIndicator(context)
-            indicator.mode = LinePagerIndicator.MODE_EXACTLY
-            indicator.yOffset = SizeUtils.dp2px(2f).toFloat()
-            indicator.setColors(ColorUtils.getColor(R.color.orange))
-            return indicator
-        }
-
-    }
 
     /**
      * 更新 Tab 颜色
      */
     private fun onUpdateTabTextColor(textColor: Int = getTextOrIconColor()) {
-        for (index in 0 until mCommonNavigatorAdapter.count) {
-            mCommonNavigatorAdapter.getTitleView(this, index)?.let { simplePagerTitleView ->
-                if (simplePagerTitleView is SimplePagerTitleView) {
-                    simplePagerTitleView.normalColor = textColor
-                    simplePagerTitleView.selectedColor = simplePagerTitleView.normalColor
-                }
+        LogUtils.e("设置Tab颜色")
+        mTabLayout.setTabTextColors(textColor, textColor)
+        val mPosition = mTabLayout.selectedTabPosition
+        for (index in 0 until mTabLayout.tabCount) {
+            mTabLayout.getTabAt(index)?.let { tab ->
+                onModifyTabTextSize(
+                    tab, textColor,
+                    if (mPosition == index) true else false
+                )
             }
         }
+    }
+
+    private fun onModifyTabTextSize(
+        tab: TabLayout.Tab,
+        textColor: Int = getTextOrIconColor(),
+        isSelected: Boolean = false
+    ) {
+        val textView = if (tab.customView != null && tab.customView is TextView) {
+            (tab.customView as TextView)
+        } else {
+            TextView(this)
+        }
+        val selectedSize =
+            TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_PX,
+                if (isSelected) 20f else 14f,
+                resources.displayMetrics
+            )
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, selectedSize)
+        textView.setTextColor(textColor)
+        textView.setText(tab.text)
+        tab.customView = textView
     }
 
     /**
      * 更新返回按钮颜色
      */
     private fun onUpdateNavigationIconColor(iconColor: Int = getTextOrIconColor()) {
+        LogUtils.e("设置 返回 颜色")
         val drawable =
             if (mToolbar.navigationIcon == null) {
                 ResourceUtils.getDrawable(R.drawable.ic_baseline_arrow_whilte_ios_24)

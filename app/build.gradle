@@ -47,5 +47,4 @@ dependencies {
     //glide 变换
 //    implementation 'jp.wasabeef:glide-transformations:4.3.0'
     //指示器
-    implementation 'com.github.hackware1993:MagicIndicator:1.7.0'
 }
